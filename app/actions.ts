@@ -46,7 +46,7 @@ export async function requestNumber(userId: string, phoneNumber: string) {
        return { error: 'Erro ao salvar número no banco de dados.' }
     }
 
-    return { success: true, numero: testNumber }
+    return { success: true, numero: phoneNumber }
   } catch (err) {
     return { error: 'Erro interno ao processar solicitação.' }
   }
