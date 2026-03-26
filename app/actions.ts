@@ -8,6 +8,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder'
 )
 
+const SIM5_TOKEN = process.env.SIM5_API_KEY || ''
+
 export async function requestNumber(userId: string, phoneNumber?: string) {
   try {
     // Check limits before everything
@@ -237,5 +239,123 @@ export async function deactivateNumber(userId: string) {
   } catch (err) {
     console.error(err)
     return { error: 'Falha ao desativar número.' }
+  }
+}
+
+// --- 5SIM PROFESSIONAL API ---
+
+export async function requestRealNumber(userId: string, service: string = 'other') {
+  try {
+    if (!SIM5_TOKEN) return { error: 'SIM5_API_KEY não configurada no servidor.' }
+
+    // Check limits
+    const { data: profile } = await supabaseAdmin
+      .from('perfis')
+      .select('sms_usados, plano')
+      .eq('id', userId)
+      .single()
+
+    if (profile && profile.plano === 'gratis' && profile.sms_usados >= 10) {
+      return { error: 'Limite do plano grátis atingido.' }
+    }
+
+    // Default to Brazil if not specified
+    const country = 'brazil'
+    const operator = 'any'
+    const url = `https://5sim.net/v1/user/buy/activation/${country}/${operator}/${service}`
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${SIM5_TOKEN}`,
+        'Accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      const err = await response.text()
+      return { error: `Erro 5sim: ${err || response.statusText}` }
+    }
+
+    const data = await response.json()
+    // 5sim returns { id, number, product, price, ... }
+
+    // Store in DB
+    const { error: dbError } = await supabaseAdmin
+      .from('numeros')
+      .upsert({
+        usuario_id: userId,
+        numero: data.number,
+        ativo: true,
+        // We reuse an existing field or handle metadata if we had a proper column
+        // For now, let's assume we store the 5sim ID to poll later
+      })
+
+    return { 
+      success: true, 
+      numero: data.number, 
+      activationId: data.id,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() 
+    }
+  } catch (err) {
+    console.error(err)
+    return { error: 'Falha ao conectar com 5sim.' }
+  }
+}
+
+export async function checkRealSMS(userId: string, activationId: string) {
+  try {
+    if (!SIM5_TOKEN) return { error: 'Token ausente.' }
+
+    const url = `https://5sim.net/v1/user/check/${activationId}`
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${SIM5_TOKEN}`,
+        'Accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) return { error: 'Erro ao consultar 5sim.' }
+
+    const data = await response.json()
+    
+    // 5sim status: PENDING, RECEIVED, FINISHED, CANCELLED
+    if (data.status === 'RECEIVED' && data.sms && data.sms.length > 0) {
+      const sms = data.sms[0] // Get first message
+      
+      // Save to DB
+      await supabaseAdmin.from('sms_recebidos').insert({
+        usuario_id: userId,
+        remetente: sms.sender || '5sim',
+        numero_destino: data.number,
+        mensagem: sms.text
+      })
+
+      // Increment profile counter
+      const { data: p } = await supabaseAdmin.from('perfis').select('sms_usados').eq('id', userId).single()
+      await supabaseAdmin.from('perfis').update({ sms_usados: (p?.sms_usados || 0) + 1 }).eq('id', userId)
+
+      // Finish activation on 5sim to confirm
+      await fetch(`https://5sim.net/v1/user/finish/${activationId}`, {
+        headers: { 'Authorization': `Bearer ${SIM5_TOKEN}` }
+      })
+
+      return { success: true, message: sms.text, status: 'RECEIVED' }
+    }
+
+    return { success: true, status: data.status }
+  } catch (err) {
+    return { error: 'Falha no polling da 5sim.' }
+  }
+}
+
+export async function cancelRealActivation(activationId: string) {
+  try {
+    const url = `https://5sim.net/v1/user/cancel/${activationId}`
+    await fetch(url, {
+      headers: { 'Authorization': `Bearer ${SIM5_TOKEN}` }
+    })
+    return { success: true }
+  } catch (err) {
+    return { error: 'Erro ao cancelar.' }
   }
 }
