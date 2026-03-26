@@ -108,6 +108,19 @@ export default function Dashboard() {
     router.push('/')
   }
 
+  const getCountryName = (num: string | null) => {
+    if (!num) return ''
+    if (num.startsWith('+55')) return 'Brasil 🇧🇷'
+    if (num.startsWith('+1')) return 'USA/Canada 🇺🇸🇨🇦'
+    if (num.startsWith('+44')) return 'Reino Unido 🇬🇧'
+    if (num.startsWith('+49')) return 'Alemanha 🇩🇪'
+    if (num.startsWith('+31')) return 'Holanda 🇳🇱'
+    if (num.startsWith('+33')) return 'França 🇫🇷'
+    if (num.startsWith('+45')) return 'Dinamarca 🇩🇰'
+    if (num.startsWith('+34')) return 'Espanha 🇪🇸'
+    return 'Internacional 🌍'
+  }
+
   if (!user) return null
 
   return (
@@ -137,7 +150,8 @@ export default function Dashboard() {
         {/* Sidebar Info */}
         <div className="space-y-6">
           <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800">
-            <h2 className="text-zinc-500 text-sm font-bold uppercase tracking-wider mb-4">Seu Número Atribuído</h2>
+            <h2 className="text-zinc-500 text-sm font-bold uppercase tracking-wider mb-2">Seu Número Atribuído</h2>
+            <div className="text-[10px] text-zinc-400 mb-2 font-bold uppercase tracking-widest">{getCountryName(assignedNumber)}</div>
             <div className="flex items-center gap-4 bg-black p-4 rounded-xl border border-zinc-800 mb-4">
               <Smartphone className="text-white" />
               <span className="text-2xl font-mono font-bold">
@@ -186,9 +200,9 @@ export default function Dashboard() {
                       else window.location.reload()
                     }
                   }}
-                  className="w-full bg-transparent text-zinc-500 text-xs py-2 hover:text-white transition-all flex items-center justify-center gap-1"
+                  className="w-full bg-transparent text-zinc-500 text-xs py-2 hover:text-white transition-all flex items-center justify-center gap-1 border border-zinc-800 rounded-lg hover:bg-zinc-900"
                 >
-                  <XCircle size={12} /> Trocar Número
+                  <XCircle size={12} /> Trocar Número / Novo Número
                 </button>
               </div>
             )}
