@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Smartphone, RefreshCw, MessageSquare, LogOut, CheckCircle2, PlusCircle } from 'lucide-react'
-import { requestNumber } from '@/app/actions'
+import { Smartphone, RefreshCw, MessageSquare, LogOut, CheckCircle2, PlusCircle, PlayCircle } from 'lucide-react'
+import { requestNumber, simulateSMS } from '@/app/actions'
 
 type Message = {
   id: string

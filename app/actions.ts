@@ -51,3 +51,36 @@ export async function requestNumber(userId: string, phoneNumber: string) {
     return { error: 'Erro interno ao processar solicitação.' }
   }
 }
+export async function simulateSMS(userId: string, targetNumber: string) {
+  try {
+    const { error: insertError } = await supabaseAdmin
+      .from('sms_recebidos')
+      .insert([
+        {
+          usuario_id: userId,
+          remetente: '+1' + Math.floor(Math.random() * 9000000000 + 1000000000),
+          numero_destino: targetNumber,
+          mensagem: `Simulação de Código: ${Math.floor(Math.random() * 900000 + 100000)}`,
+        }
+      ])
+
+    if (insertError) throw insertError
+
+    // Also increment counter
+    const { data: p } = await supabaseAdmin
+      .from('perfis')
+      .select('sms_usados')
+      .eq('id', userId)
+      .single()
+
+    await supabaseAdmin
+      .from('perfis')
+      .update({ sms_usados: (p?.sms_usados || 0) + 1 })
+      .eq('id', userId)
+
+    return { success: true }
+  } catch (err) {
+    console.error(err)
+    return { error: 'Falha na simulação.' }
+  }
+}
