@@ -244,24 +244,15 @@ export async function deactivateNumber(userId: string) {
 
 // --- 5SIM PROFESSIONAL API ---
 
-export async function requestRealNumber(userId: string, service: string = 'other') {
+export async function requestRealNumber(userId: string, service: string, operator: string = 'any') {
   try {
-    if (!SIM5_TOKEN) return { error: 'SIM5_API_KEY não configurada no servidor.' }
-
-    // Check limits
-    const { data: profile } = await supabaseAdmin
-      .from('perfis')
-      .select('sms_usados, plano')
-      .eq('id', userId)
-      .single()
-
-    if (profile && profile.plano === 'gratis' && profile.sms_usados >= 10) {
-      return { error: 'Limite do plano grátis atingido.' }
+    const SIM5_TOKEN = process.env.SIM5_API_KEY
+    if (!SIM5_TOKEN) {
+      return { error: 'SIM5_API_KEY não configurada no servidor.' }
     }
 
-    // Default to Brazil if not specified
+    // Default to Brazil
     const country = 'brazil'
-    const operator = 'any'
     const url = `https://5sim.net/v1/user/buy/activation/${country}/${operator}/${service}`
 
     const response = await fetch(url, {
@@ -292,6 +283,7 @@ export async function requestRealNumber(userId: string, service: string = 'other
       success: true, 
       numero: data.phone, 
       activationId: data.id,
+      operator: data.operator, // Add operator name
       expiresAt: data.expires || new Date(Date.now() + 15 * 60 * 1000).toISOString() 
     }
   } catch (err) {

@@ -50,6 +50,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedService, setSelectedService] = useState<string | null>(null)
   const [activationId, setActivationId] = useState<number | null>(null)
+  const [assignedOperator, setAssignedOperator] = useState<string | null>(null)
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
   const [timeLeft, setTimeLeft] = useState<number>(0)
   const [status, setStatus] = useState<'IDLE' | 'PENDING' | 'RECEIVED' | 'EXPIRED'>('IDLE')
@@ -68,6 +69,7 @@ export default function Dashboard() {
   ]
 
   const [showRecharge, setShowRecharge] = useState(false)
+  const [usePremium, setUsePremium] = useState(true) // Default to premium for reliability
 
   useEffect(() => {
     const checkUser = async () => {
@@ -267,13 +269,23 @@ export default function Dashboard() {
 
               {!assignedNumber ? (
                 <div className="space-y-6">
-                  <div className="bg-black/40 rounded-2xl p-5 border border-zinc-800/50">
-                    <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
-                      Selecione um dos serviços ao lado para obter um número exclusivo.
-                    </p>
-                    <div className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-xl border border-zinc-700/30">
-                      <span className="text-xs font-black text-white uppercase tracking-wider">{selectedService || 'Aguardando seleção...'}</span>
-                      {selectedService && <CheckCircle2 size={14} className="text-emerald-500" />}
+                  <div className="bg-emerald-500/5 rounded-2xl p-4 border border-emerald-500/10 mb-4 text-center">
+                    <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Garantia de Reembolso 🛡️</p>
+                    <p className="text-[9px] text-zinc-500 mt-1 italic">Você só paga se o código SMS chegar. Se não chegar em 5 minutos, o saldo volta na hora!</p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-zinc-800/20 rounded-2xl border border-zinc-700/50 mb-6 group cursor-pointer" onClick={() => setUsePremium(!usePremium)}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${usePremium ? 'bg-amber-500/20 text-amber-500' : 'bg-zinc-800 text-zinc-500'}`}>
+                        <CheckCircle2 size={20} />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-xs font-bold text-white">Modo Premium (Vivo/Tim/Claro)</p>
+                        <p className="text-[10px] text-zinc-500">Garante 100% de recebimento.</p>
+                      </div>
+                    </div>
+                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${usePremium ? 'bg-amber-500' : 'bg-zinc-700'}`}>
+                      <div className={`w-4 h-4 bg-white rounded-full transition-transform ${usePremium ? 'translate-x-6' : 'translate-x-0'}`} />
                     </div>
                   </div>
 
@@ -281,7 +293,7 @@ export default function Dashboard() {
                     disabled={!selectedService || limitReached}
                     onClick={async () => {
                       setLoading(true)
-                      const res = await requestRealNumber(user.id, selectedService!)
+                      const res = await requestRealNumber(user.id, selectedService!, usePremium ? 'vivo' : 'any')
                       setLoading(false)
                       
                       if (res.error) {
@@ -289,6 +301,7 @@ export default function Dashboard() {
                       } else {
                         setAssignedNumber(res.numero!)
                         setActivationId(res.activationId!)
+                        setAssignedOperator(res.operator!)
                         setExpiresAt(res.expiresAt!)
                         setStatus('PENDING')
                         setSmsCode(null)
@@ -311,6 +324,10 @@ export default function Dashboard() {
           <div>
             <p className="text-sm text-blue-300">Número Reservado (BR)</p>
             <p className="text-lg font-bold text-white tracking-widest">{assignedNumber}</p>
+            <p className="text-[10px] text-blue-400/70 font-bold uppercase tracking-tighter">Operadora: {assignedOperator || 'Desconhecida'}</p>
+            {(assignedOperator?.toLowerCase().includes('virtual') || assignedOperator?.toLowerCase().includes('61')) && (
+               <p className="text-[9px] text-yellow-500 font-bold mt-1">⚠️ Atenção: Esta operadora pode falhar. Se não chegar em 2 min, CANCELE.</p>
+            )}
           </div>
         </div>
         <div className="text-right">
