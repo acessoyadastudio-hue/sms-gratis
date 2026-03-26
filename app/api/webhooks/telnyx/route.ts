@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role for backend updates
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 export async function POST(req: Request) {
@@ -11,7 +11,6 @@ export async function POST(req: Request) {
     const body = await req.json()
     console.log('Telnyx Webhook received:', JSON.stringify(body, null, 2))
 
-    // Telnyx DLR/Inbound SMS format
     const eventType = body.data?.event_type
     const payload = body.data?.payload
 
@@ -20,34 +19,39 @@ export async function POST(req: Request) {
       const to = payload.to[0].phone_number
       const text = payload.text
 
-      // 1. Find the user assigned to this number
-      const { data: profile, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('id, sms_count, plan_type')
-        .eq('assigned_number', to)
+      // 1. Find the user assigned to this number (in 'numeros' table)
+      const { data: numData, error: numError } = await supabaseAdmin
+        .from('numeros')
+        .select('usuario_id')
+        .eq('numero', to)
+        .eq('ativo', true)
         .single()
 
-      if (profileError || !profile) {
-        console.error('No user found for number:', to)
-        // If no specific user, maybe it's a shared number or we log it globally
-        // For this project, we'll store it but without a user_id if not found
+      let userId = numData?.usuario_id || null
+
+      // 2. Fetch profile limits (perfis)
+      if (userId) {
+        const { data: profile } = await supabaseAdmin
+          .from('perfis')
+          .select('id, sms_usados, plano')
+          .eq('id', userId)
+          .single()
+
+        if (profile && profile.plano === 'gratis' && profile.sms_usados >= 10) {
+          console.log('User limit reached for:', userId)
+          return NextResponse.json({ status: 'limit_reached' })
+        }
       }
 
-      // 2. Check limits for free plan
-      if (profile && profile.plan_type === 'free' && profile.sms_count >= 10) {
-        console.log('User limit reached for:', profile.id)
-        return NextResponse.json({ status: 'limit_reached' })
-      }
-
-      // 3. Store the message
+      // 3. Store the message (sms_recebidos)
       const { error: insertError } = await supabaseAdmin
-        .from('messages')
+        .from('sms_recebidos')
         .insert([
           {
-            user_id: profile?.id || null,
-            from_number: from,
-            to_number: to,
-            text: text,
+            usuario_id: userId,
+            remetente: from,
+            numero_destino: to,
+            mensagem: text,
           }
         ])
 
@@ -57,11 +61,18 @@ export async function POST(req: Request) {
       }
 
       // 4. Update user SMS count
-      if (profile) {
+      if (userId) {
+        // Increment 'sms_usados' in 'perfis'
+        const { data: p } = await supabaseAdmin
+            .from('perfis')
+            .select('sms_usados')
+            .eq('id', userId)
+            .single()
+        
         await supabaseAdmin
-          .from('profiles')
-          .update({ sms_count: (profile.sms_count || 0) + 1 })
-          .eq('id', profile.id)
+          .from('perfis')
+          .update({ sms_usados: (p?.sms_usados || 0) + 1 })
+          .eq('id', userId)
       }
 
       return NextResponse.json({ status: 'success' })

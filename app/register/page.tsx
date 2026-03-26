@@ -24,7 +24,7 @@ export default function RegisterPage() {
       password,
       options: {
         data: {
-          full_name: name,
+          nome: name, // Matches the trigger: new.raw_user_meta_data->>'nome'
         },
       },
     })
@@ -36,25 +36,8 @@ export default function RegisterPage() {
     }
 
     if (authData.user) {
-      // Create profile record (assuming SQL setup tables)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: authData.user.id,
-            full_name: name,
-            email: email,
-            plan_type: 'free',
-            sms_count: 0
-          }
-        ])
-
-      if (profileError) {
-          console.error("Profile creation error:", profileError)
-          // We can't really rollback auth signup easily here, but we can alert
-      }
-      
-      alert('Cadastro realizado! Verifique seu e-mail ou faça login.')
+      // Manual insert removed because user has a trigger in SQL: on_auth_user_created
+      alert('Cadastro realizado! Se o e-mail de confirmação estiver ativo, verifique-o. Caso contrário, tente fazer login.')
       router.push('/login')
     }
   }
