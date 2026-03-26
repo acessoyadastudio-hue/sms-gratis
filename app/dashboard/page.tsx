@@ -12,12 +12,12 @@ import {
   PlusCircle, 
   PlayCircle, 
   XCircle,
-  Facebook,
+  Users,
+  Camera,
   Mail,
   Send,
   Music,
   Heart,
-  Instagram,
   Wallet,
   Globe,
   RefreshCcw
@@ -46,12 +46,14 @@ export default function Dashboard() {
     { id: 'whatsapp', name: 'WhatsApp', icon: MessageSquare, price: '5,47' },
     { id: 'google', name: 'Google/Gmail', icon: Mail, price: '1,21' },
     { id: 'telegram', name: 'Telegram', icon: Send, price: '6,06' },
-    { id: 'facebook', name: 'Facebook', icon: Facebook, price: '1,09' },
-    { id: 'instagram', name: 'Instagram', icon: Instagram, price: '0,42' },
+    { id: 'facebook', name: 'Facebook', icon: Users, price: '1,09' },
+    { id: 'instagram', name: 'Instagram', icon: Camera, price: '0,42' },
     { id: 'tiktok', name: 'TikTok', icon: Music, price: '0,54' },
     { id: 'tinder', name: 'Tinder', icon: Heart, price: '3,91' },
     { id: 'other', name: 'Outros', icon: Globe, price: '0,87' },
   ]
+
+  const [showRecharge, setShowRecharge] = useState(false)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -199,7 +201,10 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <button className="bg-white text-black text-xs font-black py-2.5 px-6 rounded-full hover:bg-zinc-200 transition-all active:scale-95 shadow-lg shadow-white/5">
+            <button 
+              onClick={() => setShowRecharge(true)}
+              className="bg-white text-black text-xs font-black py-2.5 px-6 rounded-full hover:bg-zinc-200 transition-all active:scale-95 shadow-lg shadow-white/5"
+            >
               RECARREGAR
             </button>
 
@@ -400,6 +405,41 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+
+      {/* Modal de Recarga PIX */}
+      {showRecharge && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowRecharge(false)} />
+          <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 max-w-md w-full relative z-10 shadow-2xl animate-in fade-in zoom-in duration-300">
+            <h2 className="text-2xl font-black mb-2 tracking-tight">Recarregar Saldo</h2>
+            <p className="text-zinc-500 text-sm mb-8">Pague via PIX e o saldo entra na hora.</p>
+            
+            <div className="bg-white p-4 rounded-3xl mb-8 flex flex-col items-center">
+              {/* Representação de um QR Code */}
+              <div className="w-48 h-48 bg-zinc-200 rounded-xl mb-4 flex items-center justify-center border-4 border-white">
+                <div className="grid grid-cols-4 gap-2 opacity-20">
+                  {[...Array(16)].map((_, i) => <div key={i} className="w-8 h-8 bg-black rounded" />)}
+                </div>
+              </div>
+              <p className="text-black font-mono text-[10px] font-bold text-center break-all opacity-50">
+                00020126360014br.gov.bcb.pix0114+5511999999995204000053039865802BR5913Yada Studio...
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button className="w-full bg-white text-black font-black p-4 rounded-2xl hover:bg-zinc-200 transition-all active:scale-95">
+                COPIAR CÓDIGO PIX
+              </button>
+              <button 
+                onClick={() => setShowRecharge(false)}
+                className="w-full text-zinc-500 hover:text-white transition-all py-2 text-xs font-bold uppercase tracking-widest"
+              >
+                FECHAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
