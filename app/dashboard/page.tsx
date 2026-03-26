@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Smartphone, RefreshCw, MessageSquare, LogOut, CheckCircle2 } from 'lucide-react'
+import { Smartphone, RefreshCw, MessageSquare, LogOut, CheckCircle2, PlusCircle } from 'lucide-react'
+import { requestNumber } from '@/app/actions'
 
 type Message = {
   id: string
@@ -128,10 +129,24 @@ export default function Dashboard() {
                 {assignedNumber || 'Nenhum número'}
               </span>
             </div>
+            
+            {!assignedNumber && (
+              <button 
+                onClick={async () => {
+                  const res = await requestNumber(user.id)
+                  if (res.error) alert(res.error)
+                  else window.location.reload()
+                }}
+                className="w-full bg-white text-black font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-all mb-4"
+              >
+                <PlusCircle size={18} /> Ativar Meu Primeiro Número
+              </button>
+            )}
+
             <p className="text-xs text-zinc-500 leading-relaxed italic">
               {assignedNumber 
                 ? "Use este número para receber SMS. As mensagens aparecerão ao lado instantaneamente."
-                : "Entre em contato com o suporte para ativar seu primeiro número."}
+                : "Clique no botão acima para ativar seu número de testes."}
             </p>
           </div>
 
