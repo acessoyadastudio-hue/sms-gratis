@@ -170,3 +170,19 @@ export async function simulateSMS(userId: string, targetNumber: string) {
     return { error: 'Falha na simulação.' }
   }
 }
+
+export async function deactivateNumber(userId: string) {
+  try {
+    const { error } = await supabaseAdmin
+      .from('numeros')
+      .update({ ativo: false })
+      .eq('usuario_id', userId)
+      .eq('ativo', true)
+
+    if (error) throw error
+    return { success: true }
+  } catch (err) {
+    console.error(err)
+    return { error: 'Falha ao desativar número.' }
+  }
+}
