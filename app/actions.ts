@@ -277,24 +277,22 @@ export async function requestRealNumber(userId: string, service: string = 'other
     }
 
     const data = await response.json()
-    // 5sim returns { id, number, product, price, ... }
+    // 5sim returns { id, phone, product, price, ... }
 
     // Store in DB
     const { error: dbError } = await supabaseAdmin
       .from('numeros')
       .upsert({
         usuario_id: userId,
-        numero: data.number,
+        numero: data.phone,
         ativo: true,
-        // We reuse an existing field or handle metadata if we had a proper column
-        // For now, let's assume we store the 5sim ID to poll later
       })
 
     return { 
       success: true, 
-      numero: data.number, 
+      numero: data.phone, 
       activationId: data.id,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() 
+      expiresAt: data.expires || new Date(Date.now() + 15 * 60 * 1000).toISOString() 
     }
   } catch (err) {
     console.error(err)
@@ -326,7 +324,7 @@ export async function checkRealSMS(userId: string, activationId: string) {
       await supabaseAdmin.from('sms_recebidos').insert({
         usuario_id: userId,
         remetente: sms.sender || '5sim',
-        numero_destino: data.number,
+        numero_destino: data.phone,
         mensagem: sms.text
       })
 
