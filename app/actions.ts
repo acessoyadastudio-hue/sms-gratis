@@ -244,15 +244,51 @@ export async function deactivateNumber(userId: string) {
 
 // --- 5SIM PROFESSIONAL API ---
 
-export async function requestRealNumber(userId: string, service: string, operator: string = 'any') {
+export async function get5SimCountries() {
+  try {
+    const response = await fetch('https://5sim.net/v1/guest/countries')
+    return await response.json()
+  } catch (err) {
+    return {}
+  }
+}
+
+export async function get5SimBalance() {
+  try {
+    const SIM5_TOKEN = process.env.SIM5_API_KEY
+    if (!SIM5_TOKEN) return { error: 'Chave ausente' }
+
+    const response = await fetch('https://5sim.net/v1/user/profile', {
+      headers: {
+        'Authorization': `Bearer ${SIM5_TOKEN}`,
+        'Accept': 'application/json'
+      }
+    })
+    
+    if (!response.ok) return { error: 'Erro na API' }
+    const data = await response.json()
+    return { balance: data.balance }
+  } catch (err) {
+    return { error: 'Desconectado' }
+  }
+}
+
+export async function get5SimProducts(country: string = 'brazil') {
+  try {
+    const response = await fetch(`https://5sim.net/v1/guest/products/${country}/any`)
+    return await response.json()
+  } catch (err) {
+    return {}
+  }
+}
+
+export async function requestRealNumber(userId: string, service: string, country: string = 'brazil', operator: string = 'any') {
   try {
     const SIM5_TOKEN = process.env.SIM5_API_KEY
     if (!SIM5_TOKEN) {
       return { error: 'SIM5_API_KEY não configurada no servidor.' }
     }
 
-    // Default to Brazil
-    const country = 'brazil'
     const url = `https://5sim.net/v1/user/buy/activation/${country}/${operator}/${service}`
 
     const response = await fetch(url, {
@@ -273,18 +309,21 @@ export async function requestRealNumber(userId: string, service: string, operato
     // Store in DB
     const { error: dbError } = await supabaseAdmin
       .from('numeros')
-      .upsert({
+      .insert({
         usuario_id: userId,
         numero: data.phone,
         ativo: true,
       })
 
+    if (dbError) console.error('Supabase DB Error:', dbError)
+
     return { 
       success: true, 
-      numero: data.phone, 
+      numero: data.phone,
       activationId: data.id,
-      operator: data.operator, // Add operator name
-      expiresAt: data.expires || new Date(Date.now() + 15 * 60 * 1000).toISOString() 
+      operator: data.operator,
+      expiresAt: new Date(Date.now() + 15 * 60000).toISOString(),
+      price: data.price
     }
   } catch (err) {
     console.error(err)

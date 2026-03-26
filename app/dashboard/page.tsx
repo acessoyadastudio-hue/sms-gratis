@@ -21,7 +21,8 @@ import {
   Wallet,
   Globe,
   RefreshCcw,
-  Clock
+  Clock,
+  Search
 } from 'lucide-react'
 import { 
   requestNumber, 
@@ -30,7 +31,10 @@ import {
   deactivateNumber,
   requestRealNumber,
   checkRealSMS,
-  cancelRealActivation
+  cancelRealActivation,
+  get5SimCountries,
+  get5SimProducts,
+  get5SimBalance
 } from '@/app/actions'
 import ServiceCard from '@/components/ServiceCard'
 
@@ -55,6 +59,15 @@ export default function Dashboard() {
   const [timeLeft, setTimeLeft] = useState<number>(0)
   const [status, setStatus] = useState<'IDLE' | 'PENDING' | 'RECEIVED' | 'EXPIRED'>('IDLE')
   const [smsCode, setSmsCode] = useState<string | null>(null)
+  
+  // Dynamic 5sim states
+  const [countries, setCountries] = useState<any>({})
+  const [products, setProducts] = useState<any>({})
+  const [selectedCountry, setSelectedCountry] = useState('brazil')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [simBalance, setSimBalance] = useState<number | null>(null)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
   const router = useRouter()
 
   const services = [
@@ -104,8 +117,45 @@ export default function Dashboard() {
     }
 
     checkUser()
+  }, [router])
 
-    // Real-time subscription for sms_recebidos
+  // Fetch dynamic 5sim data
+  useEffect(() => {
+    const fetchCountries = async () => {
+      const data = await get5SimCountries()
+      setCountries(data)
+    }
+    fetchCountries()
+  }, [])
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setProducts({})
+      const data = await get5SimProducts(selectedCountry)
+      setProducts(data)
+    }
+    fetchProducts()
+  }, [selectedCountry])
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      const res = await get5SimBalance()
+      if (res.error) {
+        setConnectionError(res.error)
+        setSimBalance(null)
+      } else {
+        setSimBalance(res.balance)
+        setConnectionError(null)
+      }
+    }
+    fetchBalance()
+    const interval = setInterval(fetchBalance, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Real-time subscription and polling
+  useEffect(() => {
+    // Polling and subscription logic moved here
     const channel = supabase
       .channel('schema-db-changes')
       .on(
@@ -233,10 +283,22 @@ export default function Dashboard() {
           
           <div className="flex items-center gap-4 md:gap-8">
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Seu Saldo</span>
-              <div className="flex items-center gap-2 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                <Wallet size={14} className="text-emerald-500" />
-                <span className="font-mono font-bold text-emerald-500 text-base">R$ 0,00</span>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">
+                {connectionError ? (
+                  <span className="text-rose-500 flex items-center gap-1">
+                    <XCircle size={10} /> {connectionError}
+                  </span>
+                ) : (
+                  <span className="text-emerald-500 flex items-center gap-1">
+                    <CheckCircle2 size={10} /> Conectado (5sim)
+                  </span>
+                )}
+              </span>
+              <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1 rounded-full border border-zinc-800">
+                <Wallet size={14} className={simBalance === 0 ? 'text-amber-500' : 'text-emerald-500'} />
+                <span className={`font-mono font-bold text-base ${simBalance === 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                  ${simBalance !== null ? simBalance.toFixed(2) : '--.--'}
+                </span>
               </div>
             </div>
 
@@ -260,40 +322,125 @@ export default function Dashboard() {
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Coluna Esquerda: Controle de Ativação */}
+          {/* Coluna Esquerda: Filtros de Seleção */}
           <div className="lg:col-span-4 space-y-6">
             <div className="p-6 rounded-3xl bg-zinc-900/50 border border-zinc-800 backdrop-blur-sm shadow-2xl">
-              <h2 className="text-zinc-500 text-[11px] font-black uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                <PlusCircle size={16} /> Status da Operação
-              </h2>
+              <h3 className="text-white font-black text-sm uppercase tracking-widest mb-6 flex items-center gap-2">
+                <div className="w-1.5 h-4 bg-amber-500 rounded-full" />
+                Configurar Ativação
+              </h3>
+              
+              {/* País */}
+              <div className="mb-6">
+                <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-2 block">País de Origem</label>
+                <div className="relative">
+                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                  <select 
+                    value={selectedCountry}
+                    onChange={(e) => {
+                      setSelectedCountry(e.target.value)
+                      setSelectedService(null)
+                      setSearchQuery('')
+                    }}
+                    className="w-full bg-black/40 border border-zinc-800 rounded-2xl p-4 pl-12 text-white text-sm outline-none focus:border-amber-500 transition-all appearance-none cursor-pointer"
+                  >
+                    {Object.keys(countries).sort().map(key => (
+                      <option key={key} value={key}>
+                        {countries[key].text_en || key}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-              {!assignedNumber ? (
-                <div className="space-y-6">
-                  <div className="bg-emerald-500/5 rounded-2xl p-4 border border-emerald-500/10 mb-4 text-center">
-                    <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Garantia de Reembolso 🛡️</p>
-                    <p className="text-[9px] text-zinc-500 mt-1 italic">Você só paga se o código SMS chegar. Se não chegar em 5 minutos, o saldo volta na hora!</p>
+              {/* Busca de Serviço */}
+              <div className="relative mb-6">
+                <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-2 block">Caminho / Ferramenta (Ex: Manus, Outlier)</label>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                  <input 
+                    type="text"
+                    placeholder="Pesquisar..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setIsDropdownOpen(true)
+                    }}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    className="w-full bg-black/40 border border-zinc-800 rounded-2xl p-4 pl-12 text-white text-sm outline-none focus:border-amber-500 transition-all shadow-inner"
+                  />
+                </div>
+                
+                {isDropdownOpen && searchQuery.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl max-h-60 overflow-y-auto z-50 p-2 custom-scrollbar">
+                    {Object.keys(products)
+                      .filter(name => name.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .slice(0, 50)
+                      .map(name => (
+                        <button
+                          key={name}
+                          onClick={() => {
+                            setSelectedService(name)
+                            setSearchQuery(name)
+                            setIsDropdownOpen(false)
+                          }}
+                          className="w-full text-left p-3 hover:bg-zinc-800 rounded-xl transition-colors text-sm text-zinc-300 flex items-center justify-between"
+                        >
+                          <span className="capitalize">{name}</span>
+                          <span className="text-[10px] text-emerald-400 font-bold tracking-widest">${products[name].Price.toFixed(2)}</span>
+                        </button>
+                      ))
+                    }
                   </div>
+                )}
+              </div>
 
-                  <div className="flex items-center justify-between p-4 bg-zinc-800/20 rounded-2xl border border-zinc-700/50 mb-6 group cursor-pointer" onClick={() => setUsePremium(!usePremium)}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${usePremium ? 'bg-amber-500/20 text-amber-500' : 'bg-zinc-800 text-zinc-500'}`}>
-                        <CheckCircle2 size={20} />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-xs font-bold text-white">Modo Premium (Vivo/Tim/Claro)</p>
-                        <p className="text-[10px] text-zinc-500">Garante 100% de recebimento.</p>
-                      </div>
-                    </div>
-                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${usePremium ? 'bg-amber-500' : 'bg-zinc-700'}`}>
-                      <div className={`w-4 h-4 bg-white rounded-full transition-transform ${usePremium ? 'translate-x-6' : 'translate-x-0'}`} />
-                    </div>
+              <div className="flex items-center justify-between p-4 bg-zinc-800/20 rounded-2xl border border-zinc-700/50 group cursor-pointer" onClick={() => setUsePremium(!usePremium)}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${usePremium ? 'bg-amber-500/20 text-amber-500' : 'bg-zinc-800 text-zinc-500'}`}>
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-white">Modo Premium</p>
+                    <p className="text-[10px] text-zinc-500">Forçar Operadora Real</p>
+                  </div>
+                </div>
+                <div className={`w-12 h-6 rounded-full p-1 transition-colors ${usePremium ? 'bg-amber-500' : 'bg-zinc-700'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${usePremium ? 'translate-x-6' : 'translate-x-0'}`} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Coluna Direita: Status da Ativação */}
+          <div className="lg:col-span-8 space-y-6">
+            <div className="bg-zinc-900/50 p-8 rounded-3xl border border-zinc-800 backdrop-blur-sm shadow-2xl h-full flex flex-col items-center justify-center min-h-[400px]">
+              {!assignedNumber ? (
+                <div className="max-w-md w-full space-y-8 text-center">
+                  <div className="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto border border-amber-500/20 shadow-inner">
+                    <Smartphone className="text-amber-500" size={40} />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-white font-black text-2xl tracking-tight">Pronto para Receber</h4>
+                    <p className="text-sm text-zinc-500">Selecione o país e a plataforma (ex: Manus AI).</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 p-6 bg-black/40 rounded-3xl border border-zinc-800/50">
+                     <div className="text-left">
+                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest block mb-1">Ferramenta</span>
+                        <span className="text-sm text-amber-500 font-black uppercase tracking-widest">{selectedService || 'Pendente'}</span>
+                     </div>
+                     <div className="text-right">
+                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest block mb-1">País</span>
+                        <span className="text-sm text-white font-black uppercase tracking-widest">{selectedCountry}</span>
+                     </div>
                   </div>
 
                   <button 
                     disabled={!selectedService || limitReached}
                     onClick={async () => {
                       setLoading(true)
-                      const res = await requestRealNumber(user.id, selectedService!, usePremium ? 'vivo' : 'any')
+                      const res = await requestRealNumber(user.id, selectedService!, selectedCountry, usePremium ? 'vivo' : 'any')
                       setLoading(false)
                       
                       if (res.error) {
