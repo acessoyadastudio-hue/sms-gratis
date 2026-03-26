@@ -152,6 +152,18 @@ export default function Dashboard() {
               </div>
             )}
 
+            {assignedNumber && (
+              <button 
+                onClick={async () => {
+                  const res = await simulateSMS(user.id, assignedNumber)
+                  if (res.error) alert(res.error)
+                }}
+                className="w-full bg-zinc-800 text-white font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-700 transition-all border border-zinc-700 mb-4"
+              >
+                <PlayCircle size={18} /> Simular Recebimento
+              </button>
+            )}
+
             <p className="text-xs text-zinc-500 leading-relaxed italic">
               {assignedNumber 
                 ? "Use este número para receber SMS. As mensagens aparecerão ao lado instantaneamente."
