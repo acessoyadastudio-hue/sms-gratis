@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Smartphone, RefreshCw, MessageSquare, LogOut, CheckCircle2, PlusCircle, PlayCircle } from 'lucide-react'
-import { requestNumber, simulateSMS, pollPublicMessages } from '@/app/actions'
+import { Smartphone, RefreshCw, MessageSquare, LogOut, CheckCircle2, PlusCircle, PlayCircle, XCircle } from 'lucide-react'
+import { requestNumber, simulateSMS, pollPublicMessages, deactivateNumber } from '@/app/actions'
 
 type Message = {
   id: string
@@ -168,15 +168,29 @@ export default function Dashboard() {
             )}
 
             {assignedNumber && (
-              <button 
-                onClick={async () => {
-                  const res = await simulateSMS(user.id, assignedNumber)
-                  if (res.error) alert(res.error)
-                }}
-                className="w-full bg-zinc-800 text-white font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-700 transition-all border border-zinc-700 mb-4"
-              >
-                <PlayCircle size={18} /> Simular Recebimento
-              </button>
+              <div className="space-y-2 mb-4">
+                <button 
+                  onClick={async () => {
+                    const res = await simulateSMS(user.id, assignedNumber)
+                    if (res.error) alert(res.error)
+                  }}
+                  className="w-full bg-zinc-800 text-white font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-700 transition-all border border-zinc-700"
+                >
+                  <PlayCircle size={18} /> Simular Recebimento
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (confirm('Deseja trocar de número? O número atual será desativado.')) {
+                      const res = await deactivateNumber(user.id)
+                      if (res.error) alert(res.error)
+                      else window.location.reload()
+                    }
+                  }}
+                  className="w-full bg-transparent text-zinc-500 text-xs py-2 hover:text-white transition-all flex items-center justify-center gap-1"
+                >
+                  <XCircle size={12} /> Trocar Número
+                </button>
+              </div>
             )}
 
             <p className="text-xs text-zinc-500 leading-relaxed italic">
