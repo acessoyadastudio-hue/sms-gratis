@@ -8,18 +8,20 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function requestNumber(userId: string) {
+export async function requestNumber(userId: string, phoneNumber: string) {
   try {
-    // 1. Check if user already has an active number
-    const { data: existing } = await supabaseAdmin
+    if (!phoneNumber) return { error: 'Por favor, insira um número válido.' }
+    
+    // 1. Check if number is already in use by someone else
+    const { data: taken } = await supabaseAdmin
       .from('numeros')
-      .select('numero')
-      .eq('usuario_id', userId)
+      .select('usuario_id')
+      .eq('numero', phoneNumber)
       .eq('ativo', true)
       .single()
 
-    if (existing) {
-      return { error: 'Você já possui um número ativo.' }
+    if (taken) {
+      return { error: 'Este número já está sendo usado por outra conta.' }
     }
 
     // 2. Here we would normally call Telnyx API to buy/allocate a number.
@@ -29,14 +31,12 @@ export async function requestNumber(userId: string) {
     // NOTE: In a production SaaS, you'd use: 
     // telnyx.numberOrders.create({ phone_number: '...', messaging_profile_id: '...' })
     
-    const testNumber = '+12025550192' // Example. User should change this to their real Telnyx number.
-
     const { error: insertError } = await supabaseAdmin
       .from('numeros')
       .insert([
         {
           usuario_id: userId,
-          numero: testNumber,
+          numero: phoneNumber,
           ativo: true
         }
       ])

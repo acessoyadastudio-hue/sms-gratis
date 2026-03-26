@@ -131,16 +131,25 @@ export default function Dashboard() {
             </div>
             
             {!assignedNumber && (
-              <button 
-                onClick={async () => {
-                  const res = await requestNumber(user.id)
-                  if (res.error) alert(res.error)
-                  else window.location.reload()
-                }}
-                className="w-full bg-white text-black font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-all mb-4"
-              >
-                <PlusCircle size={18} /> Ativar Meu Primeiro Número
-              </button>
+              <div className="space-y-4 mb-4">
+                <input 
+                  id="num-input"
+                  type="text" 
+                  placeholder="+12025550192" 
+                  className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors"
+                />
+                <button 
+                  onClick={async () => {
+                    const input = document.getElementById('num-input') as HTMLInputElement
+                    const res = await requestNumber(user.id, input.value)
+                    if (res.error) alert(res.error)
+                    else window.location.reload()
+                  }}
+                  className="w-full bg-white text-black font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-all"
+                >
+                  <PlusCircle size={18} /> Ativar Meu Número
+                </button>
+              </div>
             )}
 
             <p className="text-xs text-zinc-500 leading-relaxed italic">
