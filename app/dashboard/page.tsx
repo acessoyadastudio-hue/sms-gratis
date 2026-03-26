@@ -3,8 +3,27 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Smartphone, RefreshCw, MessageSquare, LogOut, CheckCircle2, PlusCircle, PlayCircle, XCircle } from 'lucide-react'
+import { 
+  Smartphone, 
+  RefreshCw, 
+  MessageSquare, 
+  LogOut, 
+  CheckCircle2, 
+  PlusCircle, 
+  PlayCircle, 
+  XCircle,
+  Facebook,
+  Mail,
+  Send,
+  Music,
+  Heart,
+  Instagram,
+  Wallet,
+  Globe,
+  RefreshCcw
+} from 'lucide-react'
 import { requestNumber, simulateSMS, pollPublicMessages, deactivateNumber } from '@/app/actions'
+import ServiceCard from '@/components/ServiceCard'
 
 type Message = {
   id: string
@@ -20,7 +39,19 @@ export default function Dashboard() {
   const [assignedNumber, setAssignedNumber] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedService, setSelectedService] = useState<string | null>(null)
   const router = useRouter()
+
+  const services = [
+    { id: 'whatsapp', name: 'WhatsApp', icon: MessageSquare, price: '5,47' },
+    { id: 'google', name: 'Google/Gmail', icon: Mail, price: '1,21' },
+    { id: 'telegram', name: 'Telegram', icon: Send, price: '6,06' },
+    { id: 'facebook', name: 'Facebook', icon: Facebook, price: '1,09' },
+    { id: 'instagram', name: 'Instagram', icon: Instagram, price: '0,42' },
+    { id: 'tiktok', name: 'TikTok', icon: Music, price: '0,54' },
+    { id: 'tinder', name: 'Tinder', icon: Heart, price: '3,91' },
+    { id: 'other', name: 'Outros', icon: Globe, price: '0,87' },
+  ]
 
   useEffect(() => {
     const checkUser = async () => {
@@ -148,168 +179,224 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
-      {/* Header */}
-      <header className="p-6 border-b border-zinc-900 flex justify-between items-center bg-zinc-950/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <div className="bg-white text-black p-2 rounded-lg font-bold">MS</div>
-          <h1 className="text-xl font-bold hidden md:block">Dashboard</h1>
-        </div>
-        
-        <div className="flex items-center gap-6">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold">{profile?.nome}</p>
-            <p className="text-xs text-zinc-500 capitalize">{profile?.plano} Plan</p>
+      {/* Header Profissional */}
+      <header className="p-4 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="bg-white text-black p-2 rounded-xl font-black text-xl shadow-lg shadow-white/10">MS</div>
+            <div>
+              <h1 className="text-lg font-bold leading-tight">Painel de Ativação</h1>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Premium Gateway</p>
+            </div>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="p-2 hover:bg-zinc-900 rounded-full transition-colors text-zinc-400 hover:text-white"
-          >
-            <LogOut size={20} />
-          </button>
+          
+          <div className="flex items-center gap-4 md:gap-8">
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Seu Saldo</span>
+              <div className="flex items-center gap-2 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                <Wallet size={14} className="text-emerald-500" />
+                <span className="font-mono font-bold text-emerald-500 text-base">R$ 0,00</span>
+              </div>
+            </div>
+
+            <button className="bg-white text-black text-xs font-black py-2.5 px-6 rounded-full hover:bg-zinc-200 transition-all active:scale-95 shadow-lg shadow-white/5">
+              RECARREGAR
+            </button>
+
+            <button 
+              onClick={handleLogout}
+              className="p-2 text-zinc-500 hover:text-white transition-colors"
+            >
+              <LogOut size={22} />
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 p-6 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Sidebar Info */}
-        <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800">
-            <h2 className="text-zinc-500 text-sm font-bold uppercase tracking-wider mb-2">Seu Número Atribuído</h2>
-            <div className="text-[10px] text-zinc-400 mb-2 font-bold uppercase tracking-widest">{getCountryName(assignedNumber)}</div>
-            <div className="flex items-center gap-4 bg-black p-4 rounded-xl border border-zinc-800 mb-4">
-              <Smartphone className="text-white" />
-              <span className="text-2xl font-mono font-bold">
-                {assignedNumber || 'Nenhum número'}
-              </span>
-            </div>
-            
-            {!assignedNumber && (
-              <div className="space-y-4 mb-4">
-                <input 
-                  id="num-input"
-                  type="text" 
-                  disabled={limitReached}
-                  placeholder="+12025550192" 
-                  className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors disabled:opacity-50"
-                />
-                <button 
-                  disabled={limitReached}
-                  onClick={async () => {
-                    const input = document.getElementById('num-input') as HTMLInputElement
-                    const res = await requestNumber(user.id, input.value || undefined)
-                    if (res.error) alert(res.error)
-                    else window.location.reload()
-                  }}
-                  className="w-full bg-white text-black font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-all disabled:opacity-50"
-                >
-                  <PlusCircle size={18} /> Gerar Número Grátis
-                </button>
-              </div>
-            )}
+      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Coluna Esquerda: Controle de Ativação */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="p-6 rounded-3xl bg-zinc-900/50 border border-zinc-800 backdrop-blur-sm shadow-2xl">
+              <h2 className="text-zinc-500 text-[11px] font-black uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                <PlusCircle size={16} /> Status da Operação
+              </h2>
 
-            {assignedNumber && (
-              <div className="space-y-2 mb-4">
-                <button 
-                  disabled={limitReached}
-                  onClick={async () => {
-                    const res = await simulateSMS(user.id, assignedNumber)
-                    if (res.error) alert(res.error)
-                    else fetchProfile(user.id) // Update bar immediately
-                  }}
-                  className="w-full bg-zinc-800 text-white font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-700 transition-all border border-zinc-700 disabled:opacity-50"
-                >
-                  <PlayCircle size={18} /> Simular Recebimento
-                </button>
-                <button 
-                  onClick={async () => {
-                    if (confirm('Deseja trocar de número? O número atual será desativado.')) {
-                      const res = await deactivateNumber(user.id)
+              {!assignedNumber ? (
+                <div className="space-y-6">
+                  <div className="bg-black/40 rounded-2xl p-5 border border-zinc-800/50">
+                    <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
+                      Selecione um dos serviços ao lado para obter um número exclusivo.
+                    </p>
+                    <div className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-xl border border-zinc-700/30">
+                      <span className="text-xs font-black text-white uppercase tracking-wider">{selectedService || 'Aguardando seleção...'}</span>
+                      {selectedService && <CheckCircle2 size={14} className="text-emerald-500" />}
+                    </div>
+                  </div>
+
+                  <button 
+                    disabled={!selectedService || limitReached}
+                    onClick={async () => {
+                      const res = await requestNumber(user.id)
                       if (res.error) alert(res.error)
                       else window.location.reload()
-                    }
-                  }}
-                  className="w-full bg-transparent text-zinc-500 text-xs py-2 hover:text-white transition-all flex items-center justify-center gap-1 border border-zinc-800 rounded-lg hover:bg-zinc-900"
-                >
-                  <XCircle size={12} /> Trocar Número / Novo Número
-                </button>
-              </div>
-            )}
-
-            <p className="text-xs text-zinc-500 leading-relaxed italic">
-              {limitReached 
-                ? "Você atingiu o limite do plano grátis. Faça upgrade para continuar recebendo."
-                : assignedNumber 
-                  ? "Use este número para receber SMS. As mensagens aparecerão ao lado instantaneamente."
-                  : "Clique no botão acima para ativar seu número de testes."}
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800">
-            <h2 className="text-zinc-500 text-sm font-bold uppercase tracking-wider mb-4">Limites de Uso</h2>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>SMS Recebidos</span>
-                  <span>{profile?.sms_usados || 0} / {profile?.plano === 'gratis' ? 10 : '∞'}</span>
+                    }}
+                    className="w-full bg-white text-black font-black p-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-zinc-200 transition-all disabled:opacity-30 shadow-xl shadow-white/10 active:scale-95"
+                  >
+                    <Smartphone size={20} /> OBTER NÚMERO
+                  </button>
                 </div>
-                <div className="h-2 bg-black rounded-full overflow-hidden border border-zinc-800">
-                  <div 
-                    className="h-full bg-white transition-all duration-500" 
-                    style={{ width: `${Math.min(((profile?.sms_usados || 0) / 10) * 100, 100)}%` }} 
-                  />
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-inner">
+                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-4">Número em Operação</span>
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="p-3 bg-white/5 rounded-full">
+                        <Smartphone size={28} className="text-white" />
+                      </div>
+                      <span className="text-3xl font-mono font-black text-white tracking-widest">{assignedNumber}</span>
+                    </div>
+                    
+                    <div className="w-full space-y-3">
+                      <button 
+                        disabled={limitReached}
+                        onClick={async () => {
+                          const res = await simulateSMS(user.id, assignedNumber)
+                          if (res.error) alert(res.error)
+                          else fetchProfile(user.id)
+                        }}
+                        className="w-full bg-zinc-800 text-white text-xs font-bold p-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-zinc-700 transition-all border border-zinc-700 active:scale-[0.98]"
+                      >
+                        <PlayCircle size={18} /> Simular Recebimento
+                      </button>
+
+                      <button 
+                        onClick={async () => {
+                          if (confirm('Deseja cancelar esta ativação?')) {
+                            const res = await deactivateNumber(user.id)
+                            if (res.error) alert(res.error)
+                            else window.location.reload()
+                          }
+                        }}
+                        className="w-full text-[11px] text-zinc-500 hover:text-red-400 transition-all py-2 font-bold uppercase tracking-widest"
+                      >
+                        × Cancelar e Trocar
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              {profile?.plano === 'gratis' && (
-                 <button className="w-full text-xs text-white underline hover:zinc-400">Upgrade para Ilimitado</button>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Message Feed */}
-        <div className="lg:col-span-2 space-y-6 flex flex-col">
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <MessageSquare size={24} /> 
-              Mensagens Recebidas
-            </h2>
-            <button 
-              onClick={fetchMessages}
-              disabled={loading}
-              className="p-2 hover:bg-zinc-900 rounded-full transition-colors text-zinc-400 hover:text-white"
-            >
-              <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-            </button>
+            {/* Quota Progress */}
+            <div className="p-6 rounded-3xl bg-zinc-900/30 border border-zinc-800">
+               <div className="flex items-center justify-between mb-3">
+                 <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.15em]">Sessões Utilizadas</h3>
+                 <span className="text-xs font-mono font-bold">{profile?.sms_usados || 0} / 10</span>
+               </div>
+               <div className="w-full h-1.5 bg-black rounded-full overflow-hidden border border-zinc-800">
+                 <div 
+                   className="h-full bg-white transition-all duration-1000 ease-out" 
+                   style={{ width: `${Math.min(((profile?.sms_usados || 0) / 10) * 100, 100)}%` }}
+                 />
+               </div>
+               {limitReached && (
+                 <p className="mt-3 text-[10px] text-red-500 font-black italic flex items-center gap-1">
+                   <XCircle size={10} /> Limite do plano grátis atingido!
+                 </p>
+               )}
+            </div>
           </div>
 
-          <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col">
-            {messages.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-20 text-center space-y-4">
-                <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center animate-pulse">
-                   <Smartphone className="text-zinc-600" size={32} />
+          {/* Coluna Direita: Grid de Serviços e Mensagens */}
+          <div className="lg:col-span-8 space-y-10">
+            
+            {!assignedNumber && (
+              <div className="space-y-6 animate-in fade-in duration-700">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-black tracking-tight flex items-center gap-3">
+                    <Globe size={24} className="text-zinc-700" /> Selecione o Serviço
+                  </h2>
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Preços Variáveis</span>
                 </div>
-                <p className="text-zinc-400">Aguardando seu primeiro SMS...</p>
-                <p className="text-xs text-zinc-600 max-w-xs">Nosso sistema verifica novas mensagens a cada segundo automaticamente.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-zinc-800">
-                {messages.map((msg) => (
-                  <div key={msg.id} className="p-6 hover:bg-zinc-800/50 transition-colors group">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                         <CheckCircle2 size={14} className="text-green-500" />
-                         De: {msg.remetente}
-                      </span>
-                      <span className="text-[10px] text-zinc-600">
-                        {new Date(msg.recebido_em).toLocaleString()}
-                      </span>
-                    </div>
-                    <p className="text-zinc-200 text-lg leading-relaxed font-mono selection:bg-white selection:text-black">
-                      {msg.mensagem}
-                    </p>
-                  </div>
-                ))}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {services.map((service) => (
+                    <ServiceCard
+                      key={service.id}
+                      id={service.id}
+                      name={service.name}
+                      icon={service.icon}
+                      price={service.price}
+                      onSelect={(id) => setSelectedService(id)}
+                      disabled={limitReached}
+                    />
+                  ))}
+                </div>
               </div>
             )}
+
+            {/* Histórico de Mensagens */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-black tracking-tight flex items-center gap-3">
+                  <MessageSquare size={24} className="text-zinc-700" /> Inbox em Tempo Real
+                </h2>
+                <div className="flex items-center gap-3 bg-zinc-900 px-4 py-2 rounded-full border border-zinc-800">
+                  <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Monitorando Rede</span>
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {messages.length > 0 ? (
+                  messages.map((sms, i) => (
+                    <div 
+                      key={sms.id} 
+                      className={`group p-8 border rounded-[2rem] transition-all duration-700 relative overflow-hidden ${
+                        i === 0 
+                          ? 'bg-zinc-900 border-zinc-700 shadow-2xl scale-[1.01] animate-in slide-in-from-top-8' 
+                          : 'bg-transparent border-zinc-900/50 opacity-40 hover:opacity-100'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-4 relative z-10">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-1">Remetente</span>
+                          <span className="text-sm font-black text-white bg-white/5 py-1 px-3 rounded-lg border border-white/10 uppercase tracking-tighter">
+                            {sms.remetente}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest block mb-1">Horário</span>
+                          <span className="text-xs font-mono text-zinc-400">
+                            {new Date(sms.recebido_em).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-2xl font-black tracking-tight text-white leading-tight relative z-10 selection:bg-white selection:text-black">
+                        {sms.mensagem}
+                      </p>
+                      
+                      {/* Background decorative element for the latest message */}
+                      {i === 0 && (
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-[80px] -z-0" />
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="h-80 border-4 border-dotted border-zinc-900 rounded-[3rem] flex flex-col items-center justify-center text-zinc-700 gap-6 grayscale opacity-50">
+                    <div className="p-6 bg-zinc-950 rounded-full border border-zinc-900 shadow-inner">
+                      <RefreshCcw size={48} className="animate-spin-slow" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-black uppercase tracking-[0.2em] mb-1">Aguardando Conexão</p>
+                      <p className="text-xs font-medium">Os SMS aparecerão aqui assim que forem detectados.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
         </div>
       </main>
