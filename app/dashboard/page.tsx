@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Smartphone, RefreshCw, MessageSquare, LogOut, CheckCircle2, PlusCircle, PlayCircle } from 'lucide-react'
-import { requestNumber, simulateSMS } from '@/app/actions'
+import { requestNumber, simulateSMS, pollPublicMessages } from '@/app/actions'
 
 type Message = {
   id: string
@@ -72,8 +72,23 @@ export default function Dashboard() {
       )
       .subscribe()
 
+    // Polling for public messages every 5 seconds
+    const pollInterval = setInterval(async () => {
+      if (assignedNumber && assignedNumber.startsWith('+')) {
+         const { messages: newMessages } = await pollPublicMessages(user.id, assignedNumber)
+         if (newMessages && newMessages.length > 0) {
+            setMessages((prev) => {
+               const existingIds = prev.map(m => m.id)
+               const uniqueNew = newMessages.filter((m: any) => !existingIds.includes(m.id))
+               return [...uniqueNew, ...prev]
+            })
+         }
+      }
+    }, 5000)
+
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(pollInterval)
     }
   }, [])
 
