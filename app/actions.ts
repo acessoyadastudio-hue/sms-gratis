@@ -17,7 +17,16 @@ export async function requestNumber(userId: string, phoneNumber?: string) {
       try {
         // Example: Fetching from a public list (simulated call to a free public provider)
         // In a real scenario, we'd fetch from https://receive-smss.com/ or similar API
-        const publicNumbers = ['+12015550123', '+447700900123', '+16135550199', '+33644600123']
+        const publicNumbers = [
+          '+559551583801', // Brazil
+          '+13802603245',  // USA
+          '+13473929868',  // USA
+          '+12812166971',  // USA
+          '+447538299689', // UK
+          '+447931082241', // UK
+          '+4915210947617',// Germany
+          '+31651889518'   // Netherlands
+        ]
         finalNumber = publicNumbers[Math.floor(Math.random() * publicNumbers.length)]
       } catch (e) {
         return { error: 'Falha ao buscar número público gratuito.' }
