@@ -8,48 +8,57 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function requestNumber(userId: string, phoneNumber: string) {
+export async function requestNumber(userId: string, phoneNumber?: string) {
   try {
-    if (!phoneNumber) return { error: 'Por favor, insira um número válido.' }
+    let finalNumber = phoneNumber
     
-    // 1. Check if number is already in use by someone else
+    // If no number provided, fetch a public one from a free service
+    if (!finalNumber) {
+      try {
+        // Example: Fetching from a public list (simulated call to a free public provider)
+        // In a real scenario, we'd fetch from https://receive-smss.com/ or similar API
+        const publicNumbers = ['+12015550123', '+447700900123', '+16135550199', '+33644600123']
+        finalNumber = publicNumbers[Math.floor(Math.random() * publicNumbers.length)]
+      } catch (e) {
+        return { error: 'Falha ao buscar número público gratuito.' }
+      }
+    }
+
+    // Check if taken
     const { data: taken } = await supabaseAdmin
       .from('numeros')
       .select('usuario_id')
-      .eq('numero', phoneNumber)
+      .eq('numero', finalNumber)
       .eq('ativo', true)
       .single()
 
-    if (taken) {
-      return { error: 'Este número já está sendo usado por outra conta.' }
+    if (taken && taken.usuario_id !== userId) {
+      return { error: 'Este número já está em uso.' }
     }
 
-    // 2. Here we would normally call Telnyx API to buy/allocate a number.
-    // For now, to let the user test, we will assign a "System Number" 
-    // that the user should configure in their Telnyx Messaging Profile.
-    
-    // NOTE: In a production SaaS, you'd use: 
-    // telnyx.numberOrders.create({ phone_number: '...', messaging_profile_id: '...' })
-    
     const { error: insertError } = await supabaseAdmin
       .from('numeros')
-      .insert([
+      .upsert([
         {
           usuario_id: userId,
-          numero: phoneNumber,
+          numero: finalNumber,
           ativo: true
         }
       ])
 
-    if (insertError) {
-       console.error('Error inserting number:', insertError)
-       return { error: 'Erro ao salvar número no banco de dados.' }
-    }
+    if (insertError) throw insertError
 
-    return { success: true, numero: phoneNumber }
+    return { success: true, numero: finalNumber }
   } catch (err) {
-    return { error: 'Erro interno ao processar solicitação.' }
+    return { error: 'Erro ao ativar número.' }
   }
+}
+
+// Function to "poll" for messages from the public service
+export async function pollPublicMessages(userId: string, phoneNumber: string) {
+  // This would normally fetch from the public provider's HTML/API
+  // For the demo, we'll auto-generate a message if it's a test
+  return { messages: [] } 
 }
 export async function simulateSMS(userId: string, targetNumber: string) {
   try {

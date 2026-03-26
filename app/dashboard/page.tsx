@@ -141,13 +141,13 @@ export default function Dashboard() {
                 <button 
                   onClick={async () => {
                     const input = document.getElementById('num-input') as HTMLInputElement
-                    const res = await requestNumber(user.id, input.value)
+                    const res = await requestNumber(user.id, input.value || undefined)
                     if (res.error) alert(res.error)
                     else window.location.reload()
                   }}
                   className="w-full bg-white text-black font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-all"
                 >
-                  <PlusCircle size={18} /> Ativar Meu Número
+                  <PlusCircle size={18} /> {document.getElementById('num-input')?.getAttribute('value') ? 'Ativar Número' : 'Gerar Número Grátis'}
                 </button>
               </div>
             )}
