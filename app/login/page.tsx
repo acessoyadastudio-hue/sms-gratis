@@ -7,26 +7,31 @@ import Link from 'next/link'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
+    setMessage(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
     })
 
     if (error) {
-      setError(error.message)
+      setMessage({ type: 'error', text: error.message })
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      setMessage({ 
+        type: 'success', 
+        text: 'Link de acesso enviado! Verifique seu e-mail para entrar.' 
+      })
+      setLoading(false)
     }
   }
 
@@ -48,26 +53,19 @@ export default function LoginPage() {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Senha</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 focus:outline-none focus:border-white transition-colors"
-              placeholder="••••••••"
-              required
-            />
-          </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {message && (
+            <p className={`text-sm ${message.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>
+              {message.text}
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-white text-black font-bold p-3 rounded-lg hover:bg-zinc-200 transition-colors disabled:opacity-50"
           >
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? 'Enviando link...' : 'Entrar com E-mail'}
           </button>
         </form>
 

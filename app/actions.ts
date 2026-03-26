@@ -10,6 +10,17 @@ const supabaseAdmin = createClient(
 
 export async function requestNumber(userId: string, phoneNumber?: string) {
   try {
+    // Check limits before everything
+    const { data: profile } = await supabaseAdmin
+      .from('perfis')
+      .select('sms_usados, plano')
+      .eq('id', userId)
+      .single()
+
+    if (profile && profile.plano === 'gratis' && profile.sms_usados >= 10) {
+      return { error: 'Limite de 10 SMS atingido. Faça upgrade para continuar.' }
+    }
+
     let finalNumber = phoneNumber
     
     // If no number provided, fetch a public one from a free service
@@ -17,23 +28,14 @@ export async function requestNumber(userId: string, phoneNumber?: string) {
       try {
         // Example: Fetching from a public list (simulated call to a free public provider)
         // In a real scenario, we'd fetch from https://receive-smss.com/ or similar API
+        // Expanded list with fresh numbers from multiple sources
         const publicNumbers = [
-          '+559551583801', // Brasil
-          '+13802603245',  // USA
-          '+13473929868',  // USA
-          '+12812166971',  // USA
-          '+447538299689', // UK
-          '+447931082241', // UK
-          '+4915210947617',// Germany
-          '+31651889518',  // Netherlands
-          '+12813524309',  // Canada
-          '+19707840594',  // Canada
-          '+447498579857', // UK
-          '+447304250183', // UK
-          '+31651203610',  // Netherlands
-          '+31651474087',  // Netherlands
-          '+34699305583',  // Spain
-          '+34683466361'   // Spain
+          // Source 1 (Standard)
+          '+559551583801', '+13802603245', '+13473929868', '+447538299689',
+          // Source 2 (Freshly added/Less known)
+          '+16467041416', '+447392005004', '+33644633215', '+4915219430219',
+          // Source 3 (New regions)
+          '+420722213451', '+48732151234', '+46765091211', '+351912341234'
         ]
         finalNumber = publicNumbers[Math.floor(Math.random() * publicNumbers.length)]
       } catch (e) {
@@ -74,6 +76,17 @@ export async function requestNumber(userId: string, phoneNumber?: string) {
 // Function to "poll" for messages from a public service (Scraper)
 export async function pollPublicMessages(userId: string, phoneNumber: string) {
   try {
+    // Check limits
+    const { data: profile } = await supabaseAdmin
+      .from('perfis')
+      .select('sms_usados, plano')
+      .eq('id', userId)
+      .single()
+
+    if (profile && profile.plano === 'gratis' && profile.sms_usados >= 10) {
+      return { messages: [] }
+    }
+
     // We remove the '+' and use the clean number for the URL
     const cleanNumber = phoneNumber.replace('+', '')
     
@@ -142,6 +155,18 @@ export async function pollPublicMessages(userId: string, phoneNumber: string) {
               numero_destino: msg.numero_destino,
               mensagem: msg.mensagem
             })
+            
+            // Increment the counter for each new message
+            const { data: p } = await supabaseAdmin
+              .from('perfis')
+              .select('sms_usados')
+              .eq('id', userId)
+              .single()
+
+            await supabaseAdmin
+              .from('perfis')
+              .update({ sms_usados: (p?.sms_usados || 0) + 1 })
+              .eq('id', userId)
           }
        }
     }
@@ -154,6 +179,17 @@ export async function pollPublicMessages(userId: string, phoneNumber: string) {
 }
 export async function simulateSMS(userId: string, targetNumber: string) {
   try {
+    // Check limits
+    const { data: profile } = await supabaseAdmin
+      .from('perfis')
+      .select('sms_usados, plano')
+      .eq('id', userId)
+      .single()
+
+    if (profile && profile.plano === 'gratis' && profile.sms_usados >= 10) {
+      return { error: 'Limite de 10 SMS atingido no plano grátis.' }
+    }
+
     const { error: insertError } = await supabaseAdmin
       .from('sms_recebidos')
       .insert([

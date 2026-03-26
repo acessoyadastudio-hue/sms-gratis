@@ -11,6 +11,15 @@ const supabaseAdmin = createClient(
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const signature = req.headers.get('telnyx-signature-ed25519')
+    const timestamp = req.headers.get('telnyx-timestamp')
+
+    // Simple security check if secret is configured
+    if (process.env.TELNYX_WEBHOOK_SECRET && !signature) {
+       console.error('Missing Telnyx signature')
+       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     console.log('Telnyx Webhook received:', JSON.stringify(body, null, 2))
 
     const eventType = body.data?.event_type

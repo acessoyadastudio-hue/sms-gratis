@@ -8,38 +8,38 @@ import Link from 'next/link'
 export default function RegisterPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
+    setMessage(null)
 
-    // Sign up the user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // Using signInWithOtp for Magic Link registration
+    // This will send an email to the user. If they don't exist, they'll be created.
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      password,
       options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
         data: {
-          nome: name, // Matches the trigger: new.raw_user_meta_data->>'nome'
+          nome: name,
         },
       },
     })
 
-    if (authError) {
-      setError(authError.message)
+    if (error) {
+      setMessage({ type: 'error', text: error.message })
       setLoading(false)
       return
     }
 
-    if (authData.user) {
-      // Manual insert removed because user has a trigger in SQL: on_auth_user_created
-      alert('Cadastro realizado! Se o e-mail de confirmação estiver ativo, verifique-o. Caso contrário, tente fazer login.')
-      router.push('/login')
-    }
+    setMessage({ 
+      type: 'success', 
+      text: 'Link de acesso enviado! Verifique seu e-mail para entrar na plataforma.' 
+    })
+    setLoading(false)
   }
 
   return (
@@ -71,26 +71,19 @@ export default function RegisterPage() {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Senha</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 focus:outline-none focus:border-white transition-colors"
-              placeholder="••••••••"
-              required
-            />
-          </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {message && (
+            <p className={`text-sm ${message.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>
+              {message.text}
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-white text-black font-bold p-3 rounded-lg hover:bg-zinc-200 transition-colors disabled:opacity-50"
           >
-            {loading ? 'Cadastrando...' : 'Cadastrar'}
+            {loading ? 'Enviando link...' : 'Receber Link de Acesso'}
           </button>
         </form>
 

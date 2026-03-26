@@ -74,13 +74,29 @@ export default function Dashboard() {
 
     // Polling for public messages every 5 seconds
     const pollInterval = setInterval(async () => {
-      if (assignedNumber && assignedNumber.startsWith('+')) {
-         const { messages: newMessages } = await pollPublicMessages(user.id, assignedNumber)
+      // Need a fresh check of assignedNumber and user
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (!currentUser) return
+
+      const { data: currentNum } = await supabase
+        .from('numeros')
+        .select('numero')
+        .eq('usuario_id', currentUser.id)
+        .eq('ativo', true)
+        .single()
+
+      if (currentNum?.numero && currentNum.numero.startsWith('+')) {
+         const { messages: newMessages } = await pollPublicMessages(currentUser.id, currentNum.numero)
          if (newMessages && newMessages.length > 0) {
             setMessages((prev) => {
-               const existingIds = prev.map(m => m.id)
-               const uniqueNew = newMessages.filter((m: any) => !existingIds.includes(m.id))
-               return [...uniqueNew, ...prev]
+               const existingMessages = prev.map(m => m.mensagem) // Simplified duplicate check
+               const uniqueNew = newMessages.filter((m: any) => !existingMessages.includes(m.mensagem))
+               if (uniqueNew.length > 0) {
+                 // Refresh profile to update progress bar
+                 fetchProfile(currentUser.id)
+                 return [...uniqueNew, ...prev]
+               }
+               return prev
             })
          }
       }
@@ -91,6 +107,11 @@ export default function Dashboard() {
       clearInterval(pollInterval)
     }
   }, [])
+
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase.from('perfis').select('*').eq('id', userId).single()
+    if (data) setProfile(data)
+  }
 
   const fetchMessages = async () => {
     setLoading(true)
@@ -122,6 +143,8 @@ export default function Dashboard() {
   }
 
   if (!user) return null
+
+  const limitReached = profile?.plano === 'gratis' && (profile?.sms_usados || 0) >= 10
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
@@ -164,19 +187,21 @@ export default function Dashboard() {
                 <input 
                   id="num-input"
                   type="text" 
+                  disabled={limitReached}
                   placeholder="+12025550192" 
-                  className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors"
+                  className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-white transition-colors disabled:opacity-50"
                 />
                 <button 
+                  disabled={limitReached}
                   onClick={async () => {
                     const input = document.getElementById('num-input') as HTMLInputElement
                     const res = await requestNumber(user.id, input.value || undefined)
                     if (res.error) alert(res.error)
                     else window.location.reload()
                   }}
-                  className="w-full bg-white text-black font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-all"
+                  className="w-full bg-white text-black font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-all disabled:opacity-50"
                 >
-                  <PlusCircle size={18} /> {document.getElementById('num-input')?.getAttribute('value') ? 'Ativar Número' : 'Gerar Número Grátis'}
+                  <PlusCircle size={18} /> Gerar Número Grátis
                 </button>
               </div>
             )}
@@ -184,11 +209,13 @@ export default function Dashboard() {
             {assignedNumber && (
               <div className="space-y-2 mb-4">
                 <button 
+                  disabled={limitReached}
                   onClick={async () => {
                     const res = await simulateSMS(user.id, assignedNumber)
                     if (res.error) alert(res.error)
+                    else fetchProfile(user.id) // Update bar immediately
                   }}
-                  className="w-full bg-zinc-800 text-white font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-700 transition-all border border-zinc-700"
+                  className="w-full bg-zinc-800 text-white font-bold p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-zinc-700 transition-all border border-zinc-700 disabled:opacity-50"
                 >
                   <PlayCircle size={18} /> Simular Recebimento
                 </button>
@@ -208,9 +235,11 @@ export default function Dashboard() {
             )}
 
             <p className="text-xs text-zinc-500 leading-relaxed italic">
-              {assignedNumber 
-                ? "Use este número para receber SMS. As mensagens aparecerão ao lado instantaneamente."
-                : "Clique no botão acima para ativar seu número de testes."}
+              {limitReached 
+                ? "Você atingiu o limite do plano grátis. Faça upgrade para continuar recebendo."
+                : assignedNumber 
+                  ? "Use este número para receber SMS. As mensagens aparecerão ao lado instantaneamente."
+                  : "Clique no botão acima para ativar seu número de testes."}
             </p>
           </div>
 
