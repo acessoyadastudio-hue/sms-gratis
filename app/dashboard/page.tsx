@@ -20,9 +20,18 @@ import {
   Heart,
   Wallet,
   Globe,
-  RefreshCcw
+  RefreshCcw,
+  Clock
 } from 'lucide-react'
-import { requestNumber, simulateSMS, pollPublicMessages, deactivateNumber } from '@/app/actions'
+import { 
+  requestNumber, 
+  simulateSMS, 
+  pollPublicMessages, 
+  deactivateNumber,
+  requestRealNumber,
+  checkRealSMS,
+  cancelRealActivation
+} from '@/app/actions'
 import ServiceCard from '@/components/ServiceCard'
 
 type Message = {
@@ -40,6 +49,9 @@ export default function Dashboard() {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedService, setSelectedService] = useState<string | null>(null)
+  const [activationId, setActivationId] = useState<string | null>(null)
+  const [expiresAt, setExpiresAt] = useState<string | null>(null)
+  const [timeLeft, setTimeLeft] = useState<number>(0)
   const router = useRouter()
 
   const services = [
@@ -100,17 +112,38 @@ export default function Dashboard() {
           table: 'sms_recebidos',
         },
         (payload) => {
-          setMessages((prev) => [payload.new as Message, ...prev])
+           setMessages((prev) => [payload.new as Message, ...prev])
         }
       )
       .subscribe()
 
-    // Polling for public messages every 5 seconds
+    // TIMER para expiração
+    const timerInterval = setInterval(() => {
+      if (expiresAt) {
+        const diff = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
+        setTimeLeft(diff)
+      }
+    }, 1000)
+
+    // Polling PROFISSIONAL (5sim) ou Público
     const pollInterval = setInterval(async () => {
-      // Need a fresh check of assignedNumber and user
       const { data: { user: currentUser } } = await supabase.auth.getUser()
       if (!currentUser) return
 
+      // Se temos uma ativação real da 5sim
+      if (activationId) {
+        const res = await checkRealSMS(currentUser.id, activationId)
+        if (res.status === 'RECEIVED' || res.status === 'FINISHED') {
+          // Mensagem já salva no DB pelo action, o Realtime vai pegar
+          fetchMessages()
+        } else if (res.status === 'CANCELLED' || res.status === 'EXPIRED') {
+          setActivationId(null)
+          setAssignedNumber(null)
+        }
+        return
+      }
+
+      // Fallback para polling público (se não for 5sim)
       const { data: currentNum } = await supabase
         .from('numeros')
         .select('numero')
@@ -122,10 +155,9 @@ export default function Dashboard() {
          const { messages: newMessages } = await pollPublicMessages(currentUser.id, currentNum.numero)
          if (newMessages && newMessages.length > 0) {
             setMessages((prev) => {
-               const existingMessages = prev.map(m => m.mensagem) // Simplified duplicate check
+               const existingMessages = prev.map(m => m.mensagem)
                const uniqueNew = newMessages.filter((m: any) => !existingMessages.includes(m.mensagem))
                if (uniqueNew.length > 0) {
-                 // Refresh profile to update progress bar
                  fetchProfile(currentUser.id)
                  return [...uniqueNew, ...prev]
                }
@@ -138,8 +170,9 @@ export default function Dashboard() {
     return () => {
       supabase.removeChannel(channel)
       clearInterval(pollInterval)
+      clearInterval(timerInterval)
     }
-  }, [])
+  }, [activationId, expiresAt])
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase.from('perfis').select('*').eq('id', userId).single()
@@ -243,31 +276,47 @@ export default function Dashboard() {
                   <button 
                     disabled={!selectedService || limitReached}
                     onClick={async () => {
-                      const res = await requestNumber(user.id)
-                      if (res.error) alert(res.error)
-                      else window.location.reload()
+                      setLoading(true)
+                      const res = await requestRealNumber(user.id, selectedService!)
+                      setLoading(false)
+                      
+                      if (res.error) {
+                        alert(res.error)
+                      } else {
+                        setAssignedNumber(res.numero!)
+                        setActivationId(res.activationId!)
+                        setExpiresAt(res.expiresAt!)
+                        // No reload needed, state handles it
+                      }
                     }}
                     className="w-full bg-white text-black font-black p-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-zinc-200 transition-all disabled:opacity-30 shadow-xl shadow-white/10 active:scale-95"
                   >
-                    <Smartphone size={20} /> OBTER NÚMERO
+                    {loading ? <RefreshCcw className="animate-spin" /> : <Smartphone size={20} />} 
+                    OBTER NÚMERO REAL
                   </button>
                 </div>
               ) : (
                 <div className="space-y-6">
                   <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-inner">
                     <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-4">Número em Operação</span>
-                    <div className="flex items-center gap-4 mb-6">
+                    <div className="flex items-center gap-4 mb-2">
                       <div className="p-3 bg-white/5 rounded-full">
                         <Smartphone size={28} className="text-white" />
                       </div>
                       <span className="text-3xl font-mono font-black text-white tracking-widest">{assignedNumber}</span>
                     </div>
+
+                    {timeLeft > 0 && (
+                      <div className="flex items-center gap-2 text-emerald-500 font-mono text-xs font-bold mb-6">
+                        <Clock size={12} /> Expirando em {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                      </div>
+                    )}
                     
                     <div className="w-full space-y-3">
                       <button 
                         disabled={limitReached}
                         onClick={async () => {
-                          const res = await simulateSMS(user.id, assignedNumber)
+                          const res = await simulateSMS(user.id, assignedNumber!)
                           if (res.error) alert(res.error)
                           else fetchProfile(user.id)
                         }}
@@ -278,15 +327,17 @@ export default function Dashboard() {
 
                       <button 
                         onClick={async () => {
-                          if (confirm('Deseja cancelar esta ativação?')) {
-                            const res = await deactivateNumber(user.id)
-                            if (res.error) alert(res.error)
-                            else window.location.reload()
+                          if (confirm('Deseja cancelar esta ativação? (O saldo será estornado se disponível)')) {
+                            if (activationId) await cancelRealActivation(activationId)
+                            await deactivateNumber(user.id)
+                            setAssignedNumber(null)
+                            setActivationId(null)
+                            window.location.reload()
                           }
                         }}
                         className="w-full text-[11px] text-zinc-500 hover:text-red-400 transition-all py-2 font-bold uppercase tracking-widest"
                       >
-                        × Cancelar e Trocar
+                        × Cancelar e Estornar
                       </button>
                     </div>
                   </div>
