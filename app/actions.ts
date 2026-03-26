@@ -83,29 +83,36 @@ export async function pollPublicMessages(userId: string, phoneNumber: string) {
 
     const html = await response.text()
     
-    // Simple regex to extract messages from the table 
-    // This is a basic implementation and might need adjustment if the site changes
-    const msgRegex = /<td data-header="Message">([\s\S]*?)<\/td>/g
-    const timeRegex = /<td data-header="Time">([\s\S]*?)<\/td>/g
-    const fromRegex = /<td data-header="From">([\s\S]*?)<\/td>/g
+    // New structure uses <div class="row message_details">
+    // Let's use a more robust split-and-match approach
+    const messageBlocks = html.split('<div class="row message_details">').slice(1)
     
     const messages = []
-    let match
-    while ((match = msgRegex.exec(html)) !== null) {
-       const content = match[1].trim().replace(/<[^>]*>?/gm, '')
-       const fromMatch = fromRegex.exec(html)
-       const timeMatch = timeRegex.exec(html)
-       
-       if (content && fromMatch) {
+    for (const block of messageBlocks) {
+      const senderMatch = block.match(/<a[^>]*class="sender_core_link"[^>]*>([\s\S]*?)<\/a>/) || 
+                          block.match(/<div[^>]*class="col-md-2[^>]*>([\s\S]*?)<\/div>/)
+      
+      const contentMatch = block.match(/<div[^>]*class="col-md-8[^>]*>([\s\S]*?)<\/div>/)
+      
+      if (senderMatch && contentMatch) {
+        let sender = senderMatch[1].replace(/<[^>]*>?/gm, '').trim()
+        let content = contentMatch[1].replace(/<[^>]*>?/gm, '').trim()
+        
+        // Clean up "Message" label if present
+        content = content.replace(/^Message/i, '').trim()
+        sender = sender.replace(/^Sender/i, '').trim()
+
+        if (content && sender) {
           messages.push({
-             id: Math.random().toString(36).substr(2, 9),
-             remetente: fromMatch[1].trim().replace(/<[^>]*>?/gm, ''),
-             mensagem: content,
-             numero_destino: phoneNumber,
-             recebido_em: new Date().toISOString() // We use current time as we don't parse their relative time perfectly
+            id: Math.random().toString(36).substr(2, 9),
+            remetente: sender,
+            mensagem: content,
+            numero_destino: phoneNumber,
+            recebido_em: new Date().toISOString()
           })
-       }
-       if (messages.length >= 5) break // Only latest 5
+        }
+      }
+      if (messages.length >= 8) break
     }
 
     // Save to DB to keep history and trigger Realtime
