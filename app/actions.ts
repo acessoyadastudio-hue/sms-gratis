@@ -300,25 +300,37 @@ export async function requestRealNumber(userId: string, service: string = 'other
   }
 }
 
-export async function checkRealSMS(userId: string, activationId: string) {
+export async function checkRealSMS(userId: string, id: number): Promise<{ 
+  success: boolean; 
+  sms?: string | null; 
+  code?: string | null; 
+  error?: string;
+  status?: string;
+}> {
   try {
-    if (!SIM5_TOKEN) return { error: 'Token ausente.' }
+    const SIM5_TOKEN = process.env.SIM5_API_KEY
+    if (!SIM5_TOKEN) {
+      return { success: false, error: 'SIM5_API_KEY não configurada no servidor.' }
+    }
 
-    const url = `https://5sim.net/v1/user/check/${activationId}`
-    const response = await fetch(url, {
+    const response = await fetch(`https://5sim.net/v1/user/check/${id}`, {
       headers: {
         'Authorization': `Bearer ${SIM5_TOKEN}`,
-        'Accept': 'application/json'
-      }
+        'Accept': 'application/json',
+      },
     })
-
-    if (!response.ok) return { error: 'Erro ao consultar 5sim.' }
+    
+    if (!response.ok) {
+       return { success: false, error: 'Unauthorized or not found' }
+    }
 
     const data = await response.json()
     
-    // 5sim status: PENDING, RECEIVED, FINISHED, CANCELLED
-    if (data.status === 'RECEIVED' && data.sms && data.sms.length > 0) {
-      const sms = data.sms[0] // Get first message
+    // 5sim status can be PENDING, RECEIVED, FINISHED, BANNED, CANCELED
+    const hasSms = data.sms && data.sms.length > 0
+    
+    if (hasSms) {
+      const sms = data.sms[data.sms.length - 1] // Get latest SMS
       
       // Save to DB
       await supabaseAdmin.from('sms_recebidos').insert({
@@ -333,27 +345,40 @@ export async function checkRealSMS(userId: string, activationId: string) {
       await supabaseAdmin.from('perfis').update({ sms_usados: (p?.sms_usados || 0) + 1 }).eq('id', userId)
 
       // Finish activation on 5sim to confirm
-      await fetch(`https://5sim.net/v1/user/finish/${activationId}`, {
+      await fetch(`https://5sim.net/v1/user/finish/${id}`, {
         headers: { 'Authorization': `Bearer ${SIM5_TOKEN}` }
       })
 
-      return { success: true, message: sms.text, status: 'RECEIVED' }
+      return { success: true, sms: sms.text, code: sms.code || sms.text, status: data.status }
     }
 
-    return { success: true, status: data.status }
+    if (data.status === 'FINISHED') {
+      return { success: false, error: 'Expired' }
+    }
+
+    if (data.status === 'BANNED' || data.status === 'CANCELED') {
+      return { success: false, error: 'Número banido ou cancelado.' }
+    }
+
+    return { success: true, sms: null, status: data.status }
   } catch (err) {
-    return { error: 'Falha no polling da 5sim.' }
+    console.error(err)
+    return { success: false, error: 'Falha no polling da 5sim.' }
   }
 }
 
-export async function cancelRealActivation(activationId: string) {
+export async function cancelRealActivation(id: number) {
   try {
-    const url = `https://5sim.net/v1/user/cancel/${activationId}`
+    const SIM5_TOKEN = process.env.SIM5_API_KEY
+    if (!SIM5_TOKEN) return { success: false, error: 'Token ausente.' }
+
+    const url = `https://5sim.net/v1/user/cancel/${id}`
     await fetch(url, {
       headers: { 'Authorization': `Bearer ${SIM5_TOKEN}` }
     })
     return { success: true }
   } catch (err) {
-    return { error: 'Erro ao cancelar.' }
+    console.error(err)
+    return { success: false, error: 'Erro ao cancelar.' }
   }
 }

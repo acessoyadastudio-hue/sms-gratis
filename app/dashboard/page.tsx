@@ -49,9 +49,11 @@ export default function Dashboard() {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedService, setSelectedService] = useState<string | null>(null)
-  const [activationId, setActivationId] = useState<string | null>(null)
+  const [activationId, setActivationId] = useState<number | null>(null)
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
   const [timeLeft, setTimeLeft] = useState<number>(0)
+  const [status, setStatus] = useState<'IDLE' | 'PENDING' | 'RECEIVED' | 'EXPIRED'>('IDLE')
+  const [smsCode, setSmsCode] = useState<string | null>(null)
   const router = useRouter()
 
   const services = [
@@ -131,14 +133,16 @@ export default function Dashboard() {
       if (!currentUser) return
 
       // Se temos uma ativação real da 5sim
-      if (activationId) {
+      if (activationId && status !== 'RECEIVED') {
         const res = await checkRealSMS(currentUser.id, activationId)
-        if (res.status === 'RECEIVED' || res.status === 'FINISHED') {
-          // Mensagem já salva no DB pelo action, o Realtime vai pegar
+        if (res.success && res.sms) {
+          setSmsCode(res.code || res.sms)
+          setStatus('RECEIVED')
           fetchMessages()
-        } else if (res.status === 'CANCELLED' || res.status === 'EXPIRED') {
+        } else if (res.error === 'Número banido ou cancelado.' || res.error === 'Expired') {
           setActivationId(null)
           setAssignedNumber(null)
+          setStatus('IDLE')
         }
         return
       }
@@ -286,7 +290,8 @@ export default function Dashboard() {
                         setAssignedNumber(res.numero!)
                         setActivationId(res.activationId!)
                         setExpiresAt(res.expiresAt!)
-                        // No reload needed, state handles it
+                        setStatus('PENDING')
+                        setSmsCode(null)
                       }
                     }}
                     className="w-full bg-white text-black font-black p-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-zinc-200 transition-all disabled:opacity-30 shadow-xl shadow-white/10 active:scale-95"
@@ -298,19 +303,65 @@ export default function Dashboard() {
               ) : (
                 <div className="space-y-6">
                   <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 flex flex-col items-center text-center shadow-inner">
-                    <span className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-4">Número em Operação</span>
-                    <div className="flex items-center gap-4 mb-2">
-                      <div className="p-3 bg-white/5 rounded-full">
-                        <Smartphone size={28} className="text-white" />
-                      </div>
-                      <span className="text-3xl font-mono font-black text-white tracking-widest">{assignedNumber}</span>
-                    </div>
+      <div className="bg-blue-600/20 border border-blue-500/50 rounded-xl p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center animate-pulse">
+            <Smartphone className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm text-blue-300">Número Reservado (BR)</p>
+            <p className="text-lg font-bold text-white tracking-widest">{assignedNumber}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-blue-400 uppercase font-bold">Expira em</p>
+          <div className="flex items-center gap-1 text-blue-200 font-mono text-xl">
+            <Clock className="w-4 h-4" />
+            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+          </div>
+        </div>
+      </div>
 
-                    {timeLeft > 0 && (
-                      <div className="flex items-center gap-2 text-emerald-500 font-mono text-xs font-bold mb-6">
-                        <Clock size={12} /> Expirando em {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                      </div>
-                    )}
+      <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700 text-center space-y-4">
+        {smsCode ? (
+          <div className="animate-in zoom-in duration-500">
+            <p className="text-sm text-green-400 font-bold uppercase mb-2">Mensagem Recebida!</p>
+            <div className="bg-green-500/20 border-2 border-green-500 rounded-lg p-4">
+              <p className="text-3xl font-black text-white tracking-widest">{smsCode}</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <p className="text-[10px] font-bold text-blue-400">SMS</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-slate-300">Aguardando o código SMS chegar...</p>
+            <p className="text-xs text-slate-500 italic">Isso pode levar de 30 segundos a 5 minutos.</p>
+            
+            <button
+              onClick={async () => {
+                if (activationId) {
+                  const res = await cancelRealActivation(activationId)
+                  if (res.success) {
+                    setAssignedNumber(null)
+                    setActivationId(null)
+                    setStatus('IDLE')
+                    fetchProfile(user.id)
+                  }
+                }
+              }}
+              className="text-red-400 hover:text-red-300 text-sm font-medium underline underline-offset-4"
+            >
+              Cancelar e Pedir Reembolso
+            </button>
+          </>
+        )}
+      </div>
                     
                     <div className="w-full space-y-3">
                       <button 
