@@ -30,11 +30,13 @@ export async function requestNumber(userId: string, phoneNumber?: string) {
         // In a real scenario, we'd fetch from https://receive-smss.com/ or similar API
         // Expanded list with fresh numbers from multiple sources
         const publicNumbers = [
-          // Source 1 (Standard)
-          '+559551583801', '+13802603245', '+13473929868', '+447538299689',
-          // Source 2 (Freshly added/Less known)
+          // Source: Just Added / Active Seconds Ago (Highest Success Chance)
+          '+12812166971', // USA (Active 34s ago)
+          '+447598328056', // UK (Active 37s ago)
+          '+447367524129', // UK (Active 5m ago)
+          '+559551583801', // Brasil (Active 24m ago)
+          // Other fresh ones
           '+16467041416', '+447392005004', '+33644633215', '+4915219430219',
-          // Source 3 (New regions)
           '+420722213451', '+48732151234', '+46765091211', '+351912341234'
         ]
         finalNumber = publicNumbers[Math.floor(Math.random() * publicNumbers.length)]
